@@ -148,9 +148,7 @@ func (bili *BiliBiliClient) ConnectServer(roomID int) error {
 	}
 	bili.serverConn = dstConn
 	bili.roomID = roomID
-	log.Println("aaa")
 	log.Println("弹幕链接中。。。")
-	log.Println("aaa")
 	bili.SendJoinChannel(roomID)
 	log.Println("加入房间")
 	bili.connected = true
@@ -175,13 +173,13 @@ func (bili *BiliBiliClient) heartbeatLoop() {
 func (bili *BiliBiliClient) GetRoomID() int { return bili.roomID }
 
 // SendJoinChannel define
-func (bili *BiliBiliClient) SendJoinChannel(channelID int) {
-	fmt.Printf("sendjoinchannel.test1")
+func (bili *BiliBiliClient) SendJoinChannel(channelID int) error {
+	
 	bili.uid = rand.Intn(max) + min
-	fmt.Printf("sendjoinchannel.test2")
+	
 	body := fmt.Sprintf("{\"roomid\":%d,\"uid\":%d}", channelID, bili.uid)
-	fmt.Printf("sendjoinchannel.test3")
-	bili.sendSocketData(0, 16, bili.protocolversion, 7, 1, body)
+	
+	return bili.sendSocketData(0, 16, bili.protocolversion, 7, 1, body)
 
 }
 

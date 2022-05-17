@@ -10,6 +10,14 @@ import (
 	//"https://github.com/ALwaine/gobilibili"
 )
 
+/*
+func main() {
+	bili := gobilibili.NewBiliBiliClient()
+	bili.RegHandleFunc(gobilibili.CmdAll, gobilibili.DefaultHandler)
+	bili.ConnectServer(102)
+}
+*/
+
 func main() {
 	bili := gobilibili.NewBiliBiliClient()
 	// bili.RegHandleFunc(gobilibili.CmdAll, gobilibili.DefaultHandler)
@@ -52,7 +60,7 @@ func main() {
 	})
 
 	for {
-		err := bili.ConnectServer(22801523)
+		err := bili.ConnectServer(4283506)
 		log.Println("与弹幕服务器连接中断,3秒后重连。原因:", err.Error())
 		time.Sleep(time.Second * 3)
 	}

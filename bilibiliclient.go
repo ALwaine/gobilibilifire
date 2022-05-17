@@ -2,6 +2,7 @@ package gobilibili
 
 import (
 	"bytes"
+	"compress/zlib"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -106,6 +107,8 @@ type BiliBiliClient struct {
 	uid             int
 	handlerMap      map[CmdType]([]Handler)
 	connected       bool
+
+
 }
 
 func NewBiliBiliClient() *BiliBiliClient {
@@ -150,7 +153,6 @@ func (bili *BiliBiliClient) ConnectServer(roomID int) error {
 	bili.roomID = roomID
 	log.Println("弹幕链接中。。。")
 	bili.SendJoinChannel(roomID)
-	log.Println("加入房间")
 	bili.connected = true
 	go bili.heartbeatLoop()
 	return bili.receiveMessageLoop()
@@ -218,7 +220,14 @@ func (bili *BiliBiliClient) receiveMessageLoop() (err error) {
 		buf := make([]byte, 4)
 		CatchAny(io.ReadAtLeast(bili.serverConn, buf, 4))
 		expr := binary.BigEndian.Uint32(buf)
-		CatchAny(io.ReadAtLeast(bili.serverConn, buf, 4))
+
+		buf = make([]byte, 2)
+
+		CatchAny(io.ReadAtLeast(bili.serverConn, buf, 2))
+		CatchAny(io.ReadAtLeast(bili.serverConn, buf, 2))
+		
+		dataV := binary.BigEndian.Uint16(buf)
+		buf = make([]byte, 4)
 		CatchAny(io.ReadAtLeast(bili.serverConn, buf, 4))
 		num := binary.BigEndian.Uint32(buf)
 		CatchAny(io.ReadAtLeast(bili.serverConn, buf, 4))
@@ -243,8 +252,29 @@ func (bili *BiliBiliClient) receiveMessageLoop() (err error) {
 		case 3, 4:
 			buf = make([]byte, bLen)
 			CatchAny(io.ReadAtLeast(bili.serverConn, buf, bLen))
-			messages := string(buf)
-			CatchAny(bili.parseDanMu(messages))
+			// 如果是通过zlib压缩后的JSON格式数据
+			if dataV == 2 {
+				// 对数据进行zlib解压缩
+				buf, err = DoZlibUnCompress(buf)
+
+				if err != nil {
+					return err
+				}
+				newBLen := len(buf)
+				// 循环读取多个数据包
+				offset := 0
+				for offset < newBLen {
+					bufLen := int(buf[offset+2])*256 + int(buf[offset+3]) // 因为默认会将256解释为uint8，其无法表示256，故转为int
+					//bufNum:=buf[]
+					messages := string(buf[offset+16 : offset+bufLen])
+					CatchAny(bili.parseDanMu(messages))
+
+					offset = offset + bufLen
+				}
+			} else {
+				messages := string(buf)
+				CatchAny(bili.parseDanMu(messages))
+			}
 		case 5, 6, 7:
 			buf = make([]byte, bLen)
 			CatchAny(io.ReadAtLeast(bili.serverConn, buf, bLen))
@@ -282,4 +312,22 @@ func (bili *BiliBiliClient) callCmdHandlerChain(cmd CmdType, c *Context) {
 			break
 		}
 	}
+}
+
+//进行zlib压缩
+func DoZlibCompress(src []byte) []byte {
+	var in bytes.Buffer
+	w := zlib.NewWriter(&in)
+	w.Write(src)
+	w.Close()
+	return in.Bytes()
+}
+
+//进行zlib解压缩
+func DoZlibUnCompress(compressSrc []byte) ([]byte, error) {
+	b := bytes.NewReader(compressSrc)
+	var out bytes.Buffer
+	r, err := zlib.NewReader(b)
+	io.Copy(&out, r)
+	return out.Bytes(), err
 }
